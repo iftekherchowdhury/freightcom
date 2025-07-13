@@ -20,16 +20,16 @@ app.use((req, res, next) => {
 // In-memory storage for rate requests
 const rateRequests = new Map();
 
-// ENHANCED: Weight-based rate calculation
-function calculateWeightBasedRates(packagingType, origin, destination, packagingProperties) {
-  console.log('🔍 Calculating weight-based rates...');
+// ENHANCED: Weight-based rate calculation with hardcoded Concord, ON origin
+function calculateWeightBasedRates(packagingType, destination, packagingProperties) {
+  console.log('🔍 Calculating weight-based rates from Concord, ON...');
   
   // Extract total weight and dimensions from packaging properties
   const shipmentData = analyzeShipmentData(packagingProperties, packagingType);
   console.log('📊 Shipment Analysis:', shipmentData);
   
-  // Calculate distance factor (Ottawa to various Canadian cities)
-  const distanceFactor = calculateDistanceFactor(origin, destination);
+  // Calculate distance factor from hardcoded Concord, ON origin to destination
+  const distanceFactor = calculateDistanceFactor(destination);
   
   if (packagingType === 'package') {
     return generateParcelRates(shipmentData, distanceFactor, destination);
@@ -129,45 +129,91 @@ function analyzeShipmentData(packagingProperties, packagingType) {
   };
 }
 
-// Calculate distance factor based on destination
-function calculateDistanceFactor(origin, destination) {
+// Calculate distance factor based on destination (from hardcoded Concord, ON origin)
+function calculateDistanceFactor(destination) {
   const destCity = destination.city?.toLowerCase() || '';
   const destProvince = destination.region?.toLowerCase() || '';
   
-  // Distance multipliers based on Canadian geography from Ottawa
+  // Hardcoded origin: Concord, Ontario (Designer Deck warehouse)
+  // 101 Planchet Rd. Unit #6-7, Concord, Ontario, L4K 2C6
+  console.log(`📍 Calculating distance from Concord, ON to ${destCity}, ${destProvince}`);
+  
+  // Distance multipliers based on Canadian geography FROM CONCORD, ON (GTA area)
   const distanceFactors = {
-    // Ontario
-    'toronto': 1.0, 'mississauga': 1.0, 'hamilton': 1.1,
-    'london': 1.2, 'kitchener': 1.1, 'windsor': 1.4,
+    // Greater Toronto Area (local delivery)
+    'concord': 0.8,     // Same city - cheapest
+    'toronto': 0.9,     // Very close - GTA
+    'mississauga': 0.9, // GTA area
+    'brampton': 0.8,    // Very close neighbor
+    'vaughan': 0.8,     // Adjacent city
+    'richmond hill': 0.8, // Adjacent city
+    'markham': 0.9,     // GTA area
+    'scarborough': 1.0, // GTA outer area
+    'etobicoke': 0.9,   // GTA area
+    'north york': 0.9,  // GTA area
     
-    // Quebec  
-    'montreal': 0.8, 'quebec': 1.1, 'laval': 0.8,
+    // Ontario (regional)
+    'ottawa': 2.0,      // 2x as requested
+    'hamilton': 1.0,    // Reasonable distance from GTA
+    'london': 1.2,      // Southwestern Ontario
+    'kitchener': 1.1,   // Waterloo region
+    'windsor': 1.4,     // Far southwestern Ontario
+    'kingston': 1.1,    // Eastern Ontario
+    'sudbury': 1.3,     // Northern Ontario
+    'thunder bay': 1.6, // Far northern Ontario
     
-    // Maritime
-    'halifax': 1.8, 'moncton': 1.6, 'fredericton': 1.5,
-    'charlottetown': 1.9, "st. john's": 2.2,
+    // Quebec
+    'montreal': 2.5,    // 2.5x as requested
+    'quebec': 1.3,      // Quebec City
+    'laval': 2.5,       // Montreal area (same as Montreal)
+    'gatineau': 2.0,    // Near Ottawa (same as Ottawa)
+    
+    // Maritime Provinces
+    'halifax': 1.9,     // Nova Scotia
+    'moncton': 1.7,     // New Brunswick  
+    'fredericton': 1.6, // New Brunswick
+    'charlottetown': 2.0, // PEI
+    "st. john's": 2.3,  // Newfoundland
     
     // Western Canada
-    'winnipeg': 2.1, 'regina': 2.3, 'saskatoon': 2.4,
-    'calgary': 2.6, 'edmonton': 2.7, 'vancouver': 3.0,
-    'victoria': 3.2,
+    'winnipeg': 2.2,    // Manitoba
+    'regina': 2.4,      // Saskatchewan
+    'saskatoon': 2.5,   // Saskatchewan
+    'calgary': 2.7,     // Alberta
+    'edmonton': 2.8,    // Alberta
+    'vancouver': 5.0,   // 5x as requested
+    'victoria': 5.2,    // Vancouver Island (slightly higher than Vancouver)
     
     // Territories
-    'yellowknife': 4.0, 'whitehorse': 4.5, 'iqaluit': 5.0
+    'yellowknife': 4.1, // Northwest Territories
+    'whitehorse': 4.6,  // Yukon
+    'iqaluit': 5.1      // Nunavut
   };
   
   let factor = distanceFactors[destCity] || 1.5; // Default for unknown cities
   
-  // Province-based fallbacks
+  // Province-based fallbacks if city not found
   if (!distanceFactors[destCity]) {
     const provinceFactors = {
-      'on': 1.2, 'qc': 1.0, 'bc': 3.0, 'ab': 2.6, 'sk': 2.3, 'mb': 2.1,
-      'ns': 1.8, 'nb': 1.6, 'pe': 1.9, 'nl': 2.2, 'nt': 4.0, 'nu': 5.0, 'yt': 4.5
+      'on': 1.1,  // Ontario average (closer than Ottawa-centric)
+      'qc': 2.5,  // Quebec average (updated to match Montreal)
+      'bc': 5.0,  // British Columbia average (updated to match Vancouver)
+      'ab': 2.7,  // Alberta average
+      'sk': 2.4,  // Saskatchewan average
+      'mb': 2.2,  // Manitoba average
+      'ns': 1.9,  // Nova Scotia average
+      'nb': 1.7,  // New Brunswick average
+      'pe': 2.0,  // Prince Edward Island average
+      'nl': 2.3,  // Newfoundland and Labrador average
+      'nt': 4.1,  // Northwest Territories average
+      'nu': 5.1,  // Nunavut average
+      'yt': 4.6   // Yukon average
     };
     factor = provinceFactors[destProvince] || 1.5;
+    console.log(`📍 Using province fallback for ${destProvince}: ${factor}x`);
   }
   
-  console.log(`📍 Distance factor for ${destCity}, ${destProvince}: ${factor}x`);
+  console.log(`📍 Final distance factor from Concord, ON to ${destCity}, ${destProvince}: ${factor}x`);
   return factor;
 }
 
@@ -366,12 +412,11 @@ app.post('/rate', (req, res) => {
     created: Date.now()
   });
   
-  // Generate weight-based rates
+  // Generate weight-based rates (origin is hardcoded as Ottawa)
   setTimeout(() => {
     const rates = calculateWeightBasedRates(
       details.packaging_type,
-      details.origin,
-      details.destination.address,
+      details.destination.address,  // Only destination needed
       details.packaging_properties
     );
     
@@ -437,7 +482,8 @@ app.get('/health', (req, res) => {
   res.status(200).json({ 
     status: 'healthy', 
     timestamp: new Date().toISOString(),
-    version: '3.0.1-weight-scaling',
+    version: '3.0.3-concord-origin',
+    origin: '101 Planchet Rd. Unit #6-7, Concord, Ontario, L4K 2C6',
     uptime: process.uptime()
   });
 });
@@ -446,15 +492,18 @@ app.get('/health', (req, res) => {
 app.get('/', (req, res) => {
   res.status(200).json({
     name: 'Freightcom Mock API Server - Designer Deck',
-    version: '3.0.1-weight-scaling',
-    description: 'Weight-based pricing with proper scaling and volume conversion',
+    version: '3.0.3-concord-origin',
+    description: 'Weight-based pricing with hardcoded Concord, Ontario origin',
+    origin: '101 Planchet Rd. Unit #6-7, Concord, Ontario, L4K 2C6',
     features: [
+      'Hardcoded Concord, ON origin (Designer Deck warehouse)',
+      'GTA-optimized distance calculations',
       'Weight-based rate calculation',
       'Proper weight scaling with quantity',
       'Inches to feet volume conversion',
+      'Distance-based pricing from Concord',
       'Dimensional weight for packages',
       'Freight class calculation for LTL',
-      'Distance-based pricing',
       'Residential vs commercial rates',
       'Realistic Canadian carrier pricing'
     ]
@@ -482,16 +531,21 @@ app.use((req, res) => {
 // Start server
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
-  console.log('\n🚀 Freightcom Mock API Server v3.0.1 - Weight Scaling');
+  console.log('\n🚀 Freightcom Mock API Server v3.0.3 - Concord Origin');
   console.log(`📡 Server running on: http://localhost:${PORT}`);
-  console.log('\n🎯 Latest Features:');
+  console.log('\n🏢 DESIGNER DECK WAREHOUSE:');
+  console.log('   📍 101 Planchet Rd. Unit #6-7');
+  console.log('   📍 Concord, Ontario, L4K 2C6');
+  console.log('\n🎯 Features:');
+  console.log('  🏭 Fixed Concord, ON origin (GTA warehouse)');
+  console.log('  🚚 GTA-optimized shipping rates');
   console.log('  ⚖️  Weight scales properly with quantity');
   console.log('  📏 Fixed inches to feet volume conversion');
   console.log('  🚛 Accurate freight class calculation');
-  console.log('  📍 Distance-based pricing across Canada');
+  console.log('  📍 Distance-based pricing FROM Concord');
   console.log('  🏠 Residential vs commercial surcharges');
-  console.log('  💰 Realistic per-pound and per-100lb pricing');
-  console.log('\n📊 Now properly handles weight scaling with tile quantity!');
+  console.log('  💰 Realistic Canadian carrier pricing');
+  console.log('\n📊 All shipping calculated from Designer Deck warehouse!');
 });
 
 module.exports = app;
