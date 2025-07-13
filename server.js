@@ -1,8 +1,4 @@
- 
-// server.js
-// Freightcom Mock API Server for Designer Deck - PRD Focused
-// Based on PRD requirements for freightcom_shipping module
-
+// server.js - Fixed version with consistent pricing
 const express = require('express');
 const cors = require('cors');
 const { v4: uuidv4 } = require('uuid');
@@ -24,8 +20,18 @@ app.use((req, res, next) => {
 // In-memory storage for rate requests
 const rateRequests = new Map();
 
-// Mock rate data based on PRD requirements
+// FIXED: Generate consistent rates based on address hash
 function generateMockRates(packagingType, origin, destination) {
+  // Create a simple hash from destination to ensure consistency
+  const addressKey = `${destination.city}-${destination.zip}-${packagingType}`;
+  const hash = addressKey.split('').reduce((a, b) => {
+    a = ((a << 5) - a) + b.charCodeAt(0);
+    return a & a;
+  }, 0);
+  
+  // Use hash to create consistent but varied pricing
+  const priceVariation = Math.abs(hash % 100) / 100; // 0 to 1
+  
   const baseRates = {
     package: [
       {
@@ -33,11 +39,11 @@ function generateMockRates(packagingType, origin, destination) {
         service_name: "Expedited Parcel",
         service_id: "CP_EXPEDITED",
         valid_until: { year: 2025, month: 12, day: 31 },
-        total: { currency: "CAD", value: "1550" },
-        base: { currency: "CAD", value: "1225" },
+        total: { currency: "CAD", value: Math.round(1225 + (priceVariation * 200)).toString() },
+        base: { currency: "CAD", value: Math.round(975 + (priceVariation * 150)).toString() },
         surcharges: [
-          { type: "fuel", amount: { currency: "CAD", value: "195" } },
-          { type: "residential", amount: { currency: "CAD", value: "130" } }
+          { type: "fuel", amount: { currency: "CAD", value: "150" } },
+          { type: "residential", amount: { currency: "CAD", value: "100" } }
         ],
         taxes: [],
         transit_time_days: 3,
@@ -48,11 +54,11 @@ function generateMockRates(packagingType, origin, destination) {
         service_name: "Regular Parcel",
         service_id: "CP_REGULAR",
         valid_until: { year: 2025, month: 12, day: 31 },
-        total: { currency: "CAD", value: "1225" },
-        base: { currency: "CAD", value: "975" },
+        total: { currency: "CAD", value: Math.round(975 + (priceVariation * 150)).toString() },
+        base: { currency: "CAD", value: Math.round(775 + (priceVariation * 100)).toString() },
         surcharges: [
-          { type: "fuel", amount: { currency: "CAD", value: "150" } },
-          { type: "residential", amount: { currency: "CAD", value: "100" } }
+          { type: "fuel", amount: { currency: "CAD", value: "125" } },
+          { type: "residential", amount: { currency: "CAD", value: "75" } }
         ],
         taxes: [],
         transit_time_days: 5,
@@ -63,11 +69,11 @@ function generateMockRates(packagingType, origin, destination) {
         service_name: "Ground",
         service_id: "PUR_GROUND",
         valid_until: { year: 2025, month: 12, day: 31 },
-        total: { currency: "CAD", value: "1875" },
-        base: { currency: "CAD", value: "1500" },
+        total: { currency: "CAD", value: Math.round(1485 + (priceVariation * 250)).toString() },
+        base: { currency: "CAD", value: Math.round(1200 + (priceVariation * 200)).toString() },
         surcharges: [
-          { type: "fuel", amount: { currency: "CAD", value: "225" } },
-          { type: "residential", amount: { currency: "CAD", value: "150" } }
+          { type: "fuel", amount: { currency: "CAD", value: "180" } },
+          { type: "residential", amount: { currency: "CAD", value: "105" } }
         ],
         taxes: [],
         transit_time_days: 2,
@@ -80,32 +86,15 @@ function generateMockRates(packagingType, origin, destination) {
         service_name: "LTL Standard",
         service_id: "DR_LTL_STD",
         valid_until: { year: 2025, month: 12, day: 31 },
-        total: { currency: "CAD", value: "12500" },
-        base: { currency: "CAD", value: "10000" },
+        total: { currency: "CAD", value: Math.round(10500 + (priceVariation * 1000)).toString() },
+        base: { currency: "CAD", value: Math.round(8500 + (priceVariation * 800)).toString() },
         surcharges: [
-          { type: "fuel", amount: { currency: "CAD", value: "1500" } },
-          { type: "residential_delivery", amount: { currency: "CAD", value: "750" } },
-          { type: "lift_gate", amount: { currency: "CAD", value: "250" } }
+          { type: "fuel", amount: { currency: "CAD", value: "1275" } },
+          { type: "residential_delivery", amount: { currency: "CAD", value: "500" } },
+          { type: "lift_gate", amount: { currency: "CAD", value: "225" } }
         ],
         taxes: [],
         transit_time_days: 5,
-        transit_time_not_available: false
-      },
-      {
-        carrier_name: "Day & Ross",
-        service_name: "LTL Express",
-        service_id: "DR_LTL_EXP",
-        valid_until: { year: 2025, month: 12, day: 31 },
-        total: { currency: "CAD", value: "18500" },
-        base: { currency: "CAD", value: "15000" },
-        surcharges: [
-          { type: "fuel", amount: { currency: "CAD", value: "2250" } },
-          { type: "residential_delivery", amount: { currency: "CAD", value: "750" } },
-          { type: "lift_gate", amount: { currency: "CAD", value: "250" } },
-          { type: "express", amount: { currency: "CAD", value: "250" } }
-        ],
-        taxes: [],
-        transit_time_days: 2,
         transit_time_not_available: false
       },
       {
@@ -113,50 +102,49 @@ function generateMockRates(packagingType, origin, destination) {
         service_name: "LTL",
         service_id: "PUR_LTL",
         valid_until: { year: 2025, month: 12, day: 31 },
-        total: { currency: "CAD", value: "14550" },
-        base: { currency: "CAD", value: "11750" },
+        total: { currency: "CAD", value: Math.round(12200 + (priceVariation * 800)).toString() }, // Consistent around $122
+        base: { currency: "CAD", value: Math.round(9800 + (priceVariation * 600)).toString() },
         surcharges: [
-          { type: "fuel", amount: { currency: "CAD", value: "1765" } },
-          { type: "residential_delivery", amount: { currency: "CAD", value: "785" } },
-          { type: "lift_gate", amount: { currency: "CAD", value: "250" } }
+          { type: "fuel", amount: { currency: "CAD", value: "1470" } },
+          { type: "residential_delivery", amount: { currency: "CAD", value: "650" } },
+          { type: "lift_gate", amount: { currency: "CAD", value: "280" } }
         ],
         taxes: [],
         transit_time_days: 3,
+        transit_time_not_available: false
+      },
+      {
+        carrier_name: "Day & Ross",
+        service_name: "LTL Express",
+        service_id: "DR_LTL_EXP",
+        valid_until: { year: 2025, month: 12, day: 31 },
+        total: { currency: "CAD", value: Math.round(15500 + (priceVariation * 1200)).toString() },
+        base: { currency: "CAD", value: Math.round(12500 + (priceVariation * 1000)).toString() },
+        surcharges: [
+          { type: "fuel", amount: { currency: "CAD", value: "1875" } },
+          { type: "residential_delivery", amount: { currency: "CAD", value: "750" } },
+          { type: "lift_gate", amount: { currency: "CAD", value: "250" } },
+          { type: "express", amount: { currency: "CAD", value: "125" } }
+        ],
+        taxes: [],
+        transit_time_days: 2,
         transit_time_not_available: false
       }
     ]
   };
 
-  // PRD requirement: Distance-based pricing variation
-  const rates = JSON.parse(JSON.stringify(baseRates[packagingType] || baseRates.package));
-  
-  // Simulate realistic pricing based on distance
-  const distance = Math.random() * 500 + 100; // 100-600 km across Canada
-  const distanceMultiplier = Math.max(0.8, Math.min(1.5, distance / 300));
-  
-  rates.forEach(rate => {
-    const baseValue = parseInt(rate.base.value);
-    const newBaseValue = Math.round(baseValue * distanceMultiplier);
-    rate.base.value = newBaseValue.toString();
-    
-    // Recalculate total
-    const surchargeTotal = rate.surcharges.reduce((sum, s) => sum + parseInt(s.amount.value), 0);
-    const taxTotal = rate.taxes.reduce((sum, t) => sum + parseInt(t.amount.value), 0);
-    rate.total.value = (newBaseValue + surchargeTotal + taxTotal).toString();
-  });
-
-  return rates;
+  return baseRates[packagingType] || baseRates.package;
 }
 
-// PRD Requirement FR-003: Rate Request (POST /rate)
+// Rate request endpoint
 app.post('/rate', (req, res) => {
   const requestId = uuidv4();
   const { services, excluded_services, details } = req.body;
   
   console.log('📦 Rate request for packaging type:', details.packaging_type);
-  console.log('🏠 Destination type:', details.destination.residential ? 'Residential' : 'Commercial');
+  console.log('🏠 Destination:', details.destination.city, details.destination.zip);
   
-  // Store the request for polling (PRD requirement: polling-based)
+  // Store the request for polling
   rateRequests.set(requestId, {
     id: requestId,
     request: req.body,
@@ -164,7 +152,7 @@ app.post('/rate', (req, res) => {
     created: Date.now()
   });
   
-  // PRD Requirement: Rate calculation response ≤ 3 seconds
+  // Generate consistent rates
   setTimeout(() => {
     const rates = generateMockRates(
       details.packaging_type,
@@ -189,15 +177,19 @@ app.post('/rate', (req, res) => {
       created: Date.now()
     });
     
-    console.log(`✅ Generated ${filteredRates.length} rates for request ${requestId}`);
-  }, 1000); // 1 second - well under 3 second requirement
+    console.log(`✅ Generated ${filteredRates.length} CONSISTENT rates for ${details.destination.city}`);
+    filteredRates.forEach(rate => {
+      const price = (parseInt(rate.total.value) / 100).toFixed(2);
+      console.log(`  ${rate.carrier_name} ${rate.service_name}: $${price}`);
+    });
+  }, 800); // Shorter delay for better UX
   
   res.status(202).json({
     request_id: requestId
   });
 });
 
-// PRD Requirement FR-003: Rate Polling (GET /rate/{id})
+// Rate polling endpoint  
 app.get('/rate/:rate_id', (req, res) => {
   const rateId = req.params.rate_id;
   const rateRequest = rateRequests.get(rateId);
@@ -217,7 +209,7 @@ app.get('/rate/:rate_id', (req, res) => {
     });
   }
   
-  console.log(`📋 Returning ${rateRequest.rates.length} completed rates for ${rateId}`);
+  console.log(`📋 Returning ${rateRequest.rates.length} completed rates`);
   
   res.status(200).json({
     status: {
@@ -229,49 +221,37 @@ app.get('/rate/:rate_id', (req, res) => {
   });
 });
 
-// Health check endpoint for monitoring
+// Health check endpoint
 app.get('/health', (req, res) => {
   res.status(200).json({ 
     status: 'healthy', 
     timestamp: new Date().toISOString(),
-    version: '2.5.2',
+    version: '2.5.3-consistent',
     uptime: process.uptime()
   });
 });
 
-// Root endpoint with PRD-specific API info
+// Root endpoint
 app.get('/', (req, res) => {
   res.status(200).json({
     name: 'Freightcom Mock API Server - Designer Deck',
-    version: '2.5.2',
-    description: 'Mock API server for Designer Deck freightcom_shipping module',
-    features: [
-      'Two-type shipping classification (package/pallet)',
-      'Canadian carriers: Canada Post, Purolator, Day & Ross',
-      'Residential vs Commercial pricing',
-      'Distance-based rate calculation',
-      'Polling-based rate requests',
-      'Sub-3-second response times'
-    ],
-    endpoints: {
-      rate_request: 'POST /rate',
-      get_rates: 'GET /rate/{id}',
-      health_check: 'GET /health'
-    },
-    packaging_types: {
-      package: 'For outdoor lighting, hardware, accessories, samples',
-      pallet: 'For elevated tiles, support systems, lumber, composite'
-    }
+    version: '2.5.3-consistent',
+    description: 'Mock API with CONSISTENT pricing per address',
+    improvements: [
+      'Fixed random pricing variations',
+      'Consistent rates per destination',
+      'Better logging for debugging',
+      'Shorter response times'
+    ]
   });
 });
 
-// PRD Requirement: Error handling with user-friendly messages
+// Error handling
 app.use((err, req, res, next) => {
   console.error('❌ Error:', err);
   res.status(500).json({ 
     message: 'Shipping rate calculation temporarily unavailable',
-    error: 'Please try again or contact support',
-    fallback: 'Manual shipping quote available'
+    error: 'Please try again or contact support'
   });
 });
 
@@ -280,34 +260,20 @@ app.use((req, res) => {
   console.log(`❓ 404 - Endpoint not found: ${req.method} ${req.path}`);
   res.status(404).json({ 
     message: 'Endpoint not found',
-    available_endpoints: [
-      'GET /',
-      'GET /health', 
-      'POST /rate',
-      'GET /rate/{id}'
-    ]
+    available_endpoints: ['GET /', 'GET /health', 'POST /rate', 'GET /rate/{id}']
   });
 });
 
 // Start server
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
-  console.log('\n🚀 Freightcom Mock API Server for Designer Deck');
+  console.log('\n🚀 Freightcom Mock API Server v2.5.3-consistent');
   console.log(`📡 Server running on: http://localhost:${PORT}`);
-  console.log(`🏥 Health Check: http://localhost:${PORT}/health`);
-  console.log('\n📋 PRD-Compliant Features:');
-  console.log('  ✅ Two-type shipping classification (package/pallet)');
-  console.log('  ✅ Canada Post, Purolator, Day & Ross rates');
-  console.log('  ✅ Residential vs Commercial detection');
-  console.log('  ✅ Rate calculation ≤ 3 seconds (PRD NFR-001)');
-  console.log('  ✅ Polling-based rate requests (PRD FR-003)');
-  console.log('  ✅ Mock API support for development');
-  console.log('  ✅ Distance-based pricing variation');
-  console.log('  ✅ Error handling with fallback messages');
-  console.log('\n🏗️ Designer Deck Product Types:');
-  console.log('  📦 Parcel: Outdoor lighting, hardware, accessories, samples');
-  console.log('  🚛 LTL/Pallet: Elevated tiles, support systems, lumber, composite');
-  console.log('\n🎯 Ready for freightcom_shipping module integration!');
+  console.log('\n🎯 Fixed Issues:');
+  console.log('  ✅ Consistent pricing per destination');
+  console.log('  ✅ No random price variations');
+  console.log('  ✅ Better debugging logs');
+  console.log('  ✅ Faster response times');
 });
 
 module.exports = app;
