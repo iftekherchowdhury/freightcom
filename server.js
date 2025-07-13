@@ -131,89 +131,91 @@ function analyzeShipmentData(packagingProperties, packagingType) {
 
 // Calculate distance factor based on destination (from hardcoded Concord, ON origin)
 function calculateDistanceFactor(destination) {
-  const destCity = destination.city?.toLowerCase() || '';
   const destProvince = destination.region?.toLowerCase() || '';
+  const destCity = destination.city?.toLowerCase() || '';
   
   // Hardcoded origin: Concord, Ontario (Designer Deck warehouse)
   // 101 Planchet Rd. Unit #6-7, Concord, Ontario, L4K 2C6
-  console.log(`📍 Calculating distance from Concord, ON to ${destCity}, ${destProvince}`);
+  console.log(`📍 Calculating distance from Concord, ON to ${destCity}, ${destProvince.toUpperCase()}`);
   
-  // Distance multipliers based on Canadian geography FROM CONCORD, ON (GTA area)
-  const distanceFactors = {
-    // Greater Toronto Area (local delivery)
-    'concord': 0.8,     // Same city - cheapest
-    'toronto': 0.9,     // Very close - GTA
-    'mississauga': 0.9, // GTA area
-    'brampton': 0.8,    // Very close neighbor
-    'vaughan': 0.8,     // Adjacent city
-    'richmond hill': 0.8, // Adjacent city
-    'markham': 0.9,     // GTA area
-    'scarborough': 1.0, // GTA outer area
-    'etobicoke': 0.9,   // GTA area
-    'north york': 0.9,  // GTA area
+  // Distance multipliers based on PROVINCE/STATE (primary method)
+  const provinceFactors = {
+    // Canadian Provinces
+    'ontario': 1.0,                    // Home province - base rate
+    'quebec': 2.5,                     // 2.5x as requested
+    'british columbia': 5.0,           // 5x as requested (Vancouver province)
+    'alberta': 2.7,                    // Western Canada
+    'saskatchewan': 2.4,               // Prairie province
+    'manitoba': 2.2,                   // Prairie province
+    'nova scotia': 1.9,                // Maritime
+    'new brunswick': 1.7,              // Maritime
+    'prince edward island': 2.0,       // Maritime island
+    'newfoundland and labrador': 2.3,  // Far east
+    'northwest territories': 4.1,      // Northern territory
+    'nunavut': 5.1,                    // Northern territory
+    'yukon': 4.6,                      // Northern territory
     
-    // Ontario (regional)
-    'ottawa': 2.0,      // 2x as requested
-    'hamilton': 1.0,    // Reasonable distance from GTA
-    'london': 1.2,      // Southwestern Ontario
-    'kitchener': 1.1,   // Waterloo region
-    'windsor': 1.4,     // Far southwestern Ontario
-    'kingston': 1.1,    // Eastern Ontario
-    'sudbury': 1.3,     // Northern Ontario
-    'thunder bay': 1.6, // Far northern Ontario
-    
-    // Quebec
-    'montreal': 2.5,    // 2.5x as requested
-    'quebec': 1.3,      // Quebec City
-    'laval': 2.5,       // Montreal area (same as Montreal)
-    'gatineau': 2.0,    // Near Ottawa (same as Ottawa)
-    
-    // Maritime Provinces
-    'halifax': 1.9,     // Nova Scotia
-    'moncton': 1.7,     // New Brunswick  
-    'fredericton': 1.6, // New Brunswick
-    'charlottetown': 2.0, // PEI
-    "st. john's": 2.3,  // Newfoundland
-    
-    // Western Canada
-    'winnipeg': 2.2,    // Manitoba
-    'regina': 2.4,      // Saskatchewan
-    'saskatoon': 2.5,   // Saskatchewan
-    'calgary': 2.7,     // Alberta
-    'edmonton': 2.8,    // Alberta
-    'vancouver': 5.0,   // 5x as requested
-    'victoria': 5.2,    // Vancouver Island (slightly higher than Vancouver)
-    
-    // Territories
-    'yellowknife': 4.1, // Northwest Territories
-    'whitehorse': 4.6,  // Yukon
-    'iqaluit': 5.1      // Nunavut
+    // Alternative spellings/abbreviations
+    'on': 1.0,     // Ontario
+    'qc': 2.5,     // Quebec  
+    'bc': 5.0,     // British Columbia
+    'ab': 2.7,     // Alberta
+    'sk': 2.4,     // Saskatchewan
+    'mb': 2.2,     // Manitoba
+    'ns': 1.9,     // Nova Scotia
+    'nb': 1.7,     // New Brunswick
+    'pe': 2.0,     // Prince Edward Island
+    'nl': 2.3,     // Newfoundland and Labrador
+    'nt': 4.1,     // Northwest Territories
+    'nu': 5.1,     // Nunavut
+    'yt': 4.6      // Yukon
   };
   
-  let factor = distanceFactors[destCity] || 1.5; // Default for unknown cities
+  // First try to get factor by province/state
+  let factor = provinceFactors[destProvince];
   
-  // Province-based fallbacks if city not found
-  if (!distanceFactors[destCity]) {
-    const provinceFactors = {
-      'on': 1.1,  // Ontario average (closer than Ottawa-centric)
-      'qc': 2.5,  // Quebec average (updated to match Montreal)
-      'bc': 5.0,  // British Columbia average (updated to match Vancouver)
-      'ab': 2.7,  // Alberta average
-      'sk': 2.4,  // Saskatchewan average
-      'mb': 2.2,  // Manitoba average
-      'ns': 1.9,  // Nova Scotia average
-      'nb': 1.7,  // New Brunswick average
-      'pe': 2.0,  // Prince Edward Island average
-      'nl': 2.3,  // Newfoundland and Labrador average
-      'nt': 4.1,  // Northwest Territories average
-      'nu': 5.1,  // Nunavut average
-      'yt': 4.6   // Yukon average
+  // Special handling for major cities within Ontario (more granular pricing)
+  if (destProvince === 'ontario' || destProvince === 'on') {
+    const ontarioCityFactors = {
+      // Greater Toronto Area (local delivery)
+      'concord': 0.8,        // Same city - cheapest
+      'toronto': 0.9,        // Very close - GTA
+      'mississauga': 0.9,    // GTA area
+      'brampton': 0.8,       // Very close neighbor
+      'vaughan': 0.8,        // Adjacent city
+      'richmond hill': 0.8,  // Adjacent city
+      'markham': 0.9,        // GTA area
+      'scarborough': 1.0,    // GTA outer area
+      'etobicoke': 0.9,      // GTA area
+      'north york': 0.9,     // GTA area
+      
+      // Other Ontario cities
+      'ottawa': 2.0,         // 2x as requested (even though in same province)
+      'hamilton': 1.0,       // Reasonable distance from GTA
+      'london': 1.2,         // Southwestern Ontario
+      'kitchener': 1.1,      // Waterloo region
+      'windsor': 1.4,        // Far southwestern Ontario
+      'kingston': 1.1,       // Eastern Ontario
+      'sudbury': 1.3,        // Northern Ontario
+      'thunder bay': 1.6     // Far northern Ontario
     };
-    factor = provinceFactors[destProvince] || 1.5;
-    console.log(`📍 Using province fallback for ${destProvince}: ${factor}x`);
+    
+    // Use city-specific factor for Ontario if available
+    if (ontarioCityFactors[destCity]) {
+      factor = ontarioCityFactors[destCity];
+      console.log(`📍 Using Ontario city-specific rate for ${destCity}: ${factor}x`);
+    }
   }
   
-  console.log(`📍 Final distance factor from Concord, ON to ${destCity}, ${destProvince}: ${factor}x`);
+  // Fallback if province not found
+  if (!factor) {
+    factor = 1.5; // Default for unknown provinces
+    console.log(`📍 Using default rate for unknown province ${destProvince}: ${factor}x`);
+  } else {
+    console.log(`📍 Using province rate for ${destProvince.toUpperCase()}: ${factor}x`);
+  }
+  
+  console.log(`📍 Final distance factor from Concord, ON to ${destCity}, ${destProvince.toUpperCase()}: ${factor}x`);
   return factor;
 }
 
