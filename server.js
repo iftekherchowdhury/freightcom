@@ -48,40 +48,65 @@ function analyzeShipmentData(packagingProperties, packagingType) {
   if (packagingType === 'package' && packagingProperties.packages) {
     packagingProperties.packages.forEach(pkg => {
       const weight = pkg.measurements?.weight?.value || 1;
+      const quantity = pkg.quantity || 1; // Account for quantity!
       const cuboid = pkg.measurements?.cuboid || {};
       
-      totalWeight += weight;
-      itemCount++;
+      totalWeight += weight * quantity; // Multiply by quantity
+      itemCount += quantity;
       
-      // Convert dimensions to feet for volume calculation
-      let l = cuboid.l || 12;
-      let w = cuboid.w || 8;
-      let h = cuboid.h || 6;
-      
-      if (cuboid.unit === 'in') {
-        l /= 12; w /= 12; h /= 12;
+      // Use volume directly if available, otherwise calculate from dimensions
+      let volume;
+      if (pkg.volume) {
+        volume = pkg.volume; // Use volume directly from Odoo
+      } else {
+        // Fallback: calculate from dimensions
+        let l = cuboid.l || 12;
+        let w = cuboid.w || 8;
+        let h = cuboid.h || 6;
+        
+        if (cuboid.unit === 'in') {
+          l /= 12; w /= 12; h /= 12;
+        }
+        
+        volume = l * w * h;
       }
       
-      const volume = l * w * h;
-      totalVolume += volume;
-      maxDimension = Math.max(maxDimension, l, w, h);
+      totalVolume += volume * quantity; // Multiply volume by quantity too
+      maxDimension = Math.max(maxDimension, cuboid.l || 12, cuboid.w || 8, cuboid.h || 6);
     });
   } else if (packagingType === 'pallet' && packagingProperties.pallets) {
     packagingProperties.pallets.forEach(pallet => {
       const weight = pallet.measurements?.weight?.value || 50;
+      const quantity = pallet.quantity || 1; // Account for quantity!
       const cuboid = pallet.measurements?.cuboid || {};
       
-      totalWeight += weight;
-      itemCount++;
+      const totalPalletWeight = weight; // Weight already includes quantity from Odoo
+      totalWeight += totalPalletWeight;
+      itemCount += quantity; // Count actual items
       
-      // Pallet dimensions are typically in feet
-      const l = cuboid.l || 4;
-      const w = cuboid.w || 4;
-      const h = cuboid.h || 4;
+      // Use volume directly if available, otherwise calculate from dimensions  
+      let volume;
+      if (pallet.volume) {
+        volume = pallet.volume; // Use volume directly from Odoo
+      } else {
+        // Calculate from dimensions - CONVERT INCHES TO FEET
+        let l = cuboid.l || 4;
+        let w = cuboid.w || 4;
+        let h = cuboid.h || 4;
+        
+        // Check if dimensions are in inches (for tiles) and convert to feet
+        if (cuboid.unit === 'in' || l > 12) { // Assume inches if large numbers or specified
+          l = l / 12;  // Convert inches to feet
+          w = w / 12;  // Convert inches to feet  
+          h = h / 12;  // Convert inches to feet
+        }
+        
+        volume = l * w * h; // Volume in cubic feet
+      }
       
-      const volume = l * w * h;
-      totalVolume += volume;
-      maxDimension = Math.max(maxDimension, l, w, h);
+      const totalPalletVolume = volume * quantity; // Multiply volume by quantity too
+      totalVolume += totalPalletVolume;
+      maxDimension = Math.max(maxDimension, cuboid.l || 4, cuboid.w || 4, cuboid.h || 4);
     });
   }
   
@@ -331,7 +356,7 @@ app.post('/rate', (req, res) => {
   const { services, excluded_services, details } = req.body;
   
   console.log('📦 Rate request for packaging type:', details.packaging_type);
-  console.log('🏠 Destination:', details.destination.city, details.destination.zip);
+  console.log('🏠 Destination:', details.destination.address.city, details.destination.address.postal_code);
   
   // Store the request for polling
   rateRequests.set(requestId, {
@@ -346,7 +371,7 @@ app.post('/rate', (req, res) => {
     const rates = calculateWeightBasedRates(
       details.packaging_type,
       details.origin,
-      details.destination,
+      details.destination.address,
       details.packaging_properties
     );
     
@@ -367,7 +392,7 @@ app.post('/rate', (req, res) => {
       created: Date.now()
     });
     
-    console.log(`✅ Generated ${filteredRates.length} WEIGHT-BASED rates for ${details.destination.city}`);
+    console.log(`✅ Generated ${filteredRates.length} WEIGHT-BASED rates for ${details.destination.address.city}`);
   }, 800);
   
   res.status(202).json({
@@ -412,7 +437,7 @@ app.get('/health', (req, res) => {
   res.status(200).json({ 
     status: 'healthy', 
     timestamp: new Date().toISOString(),
-    version: '3.0.0-weight-based',
+    version: '3.0.1-weight-scaling',
     uptime: process.uptime()
   });
 });
@@ -421,10 +446,12 @@ app.get('/health', (req, res) => {
 app.get('/', (req, res) => {
   res.status(200).json({
     name: 'Freightcom Mock API Server - Designer Deck',
-    version: '3.0.0-weight-based',
-    description: 'Weight-based pricing that matches real Freightcom API patterns',
+    version: '3.0.1-weight-scaling',
+    description: 'Weight-based pricing with proper scaling and volume conversion',
     features: [
       'Weight-based rate calculation',
+      'Proper weight scaling with quantity',
+      'Inches to feet volume conversion',
       'Dimensional weight for packages',
       'Freight class calculation for LTL',
       'Distance-based pricing',
@@ -455,16 +482,16 @@ app.use((req, res) => {
 // Start server
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
-  console.log('\n🚀 Freightcom Mock API Server v3.0.0 - Weight-Based Pricing');
+  console.log('\n🚀 Freightcom Mock API Server v3.0.1 - Weight Scaling');
   console.log(`📡 Server running on: http://localhost:${PORT}`);
-  console.log('\n🎯 New Weight-Based Features:');
-  console.log('  ⚖️  Actual product weight calculations');
-  console.log('  📏 Dimensional weight for large/light packages');
-  console.log('  🚛 Freight class calculation (density-based)');
+  console.log('\n🎯 Latest Features:');
+  console.log('  ⚖️  Weight scales properly with quantity');
+  console.log('  📏 Fixed inches to feet volume conversion');
+  console.log('  🚛 Accurate freight class calculation');
   console.log('  📍 Distance-based pricing across Canada');
   console.log('  🏠 Residential vs commercial surcharges');
   console.log('  💰 Realistic per-pound and per-100lb pricing');
-  console.log('\n📊 Test different product weights to see pricing changes!');
+  console.log('\n📊 Now properly handles weight scaling with tile quantity!');
 });
 
 module.exports = app;
